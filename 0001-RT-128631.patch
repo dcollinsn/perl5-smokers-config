@@ -1,0 +1,56 @@
+From 22ccac3b946484ba7494fa04ef34c4ac8732e587 Mon Sep 17 00:00:00 2001
+From: Dan Collins <dcollinsn@gmail.com>
+Date: Tue, 19 Jul 2016 11:18:44 -0400
+Subject: [PATCH] [RT #128631] MinGW.org 3.21 and greater provide mkstemp
+
+---
+ win32/config_H.gc | 3 ++-
+ win32/win32.c     | 2 +-
+ win32/win32.h     | 2 +-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/win32/config_H.gc b/win32/config_H.gc
+index 2254974..eaeec30 100644
+--- a/win32/config_H.gc
++++ b/win32/config_H.gc
+@@ -1974,7 +1974,8 @@
+  *	available to exclusively create and open a uniquely named
+  *	temporary file.
+  */
+-#if __MINGW64_VERSION_MAJOR >= 4
++#if (defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR >= 4) || \
++    (defined(__MINGW32_MAJOR_VERSION) && (__MINGW32_MAJOR_VERSION == 3 && __MINGW32_MINOR_VERSION >= 21))
+ #define HAS_MKSTEMP
+ #endif
+ 
+diff --git a/win32/win32.c b/win32/win32.c
+index 6ac73e2..5f2831a 100644
+--- a/win32/win32.c
++++ b/win32/win32.c
+@@ -1142,7 +1142,8 @@ chown(const char *path, uid_t owner, gid_t group)
+  * XXX this needs strengthening  (for PerlIO)
+  *   -- BKS, 11-11-200
+ */
+-#if !defined(__MINGW64_VERSION_MAJOR) || __MINGW64_VERSION_MAJOR < 4
++#if !(defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR >= 4) && \
++    !(defined(__MINGW32_MAJOR_VERSION) && (__MINGW32_MAJOR_VERSION == 3 && __MINGW32_MINOR_VERSION >= 21))
+ int mkstemp(const char *path)
+ {
+     dTHX;
+diff --git a/win32/win32.h b/win32/win32.h
+index 9b79e00..042c2f6 100644
+--- a/win32/win32.h
++++ b/win32/win32.h
+@@ -359,7 +359,8 @@ extern  void	*sbrk(ptrdiff_t need);
+ #endif
+ extern	char *	getlogin(void);
+ extern	int	chown(const char *p, uid_t o, gid_t g);
+-#if !defined(__MINGW64_VERSION_MAJOR) || __MINGW64_VERSION_MAJOR < 4
++#if !(defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR >= 4) && \
++    !(defined(__MINGW32_MAJOR_VERSION) && (__MINGW32_MAJOR_VERSION == 3 && __MINGW32_MINOR_VERSION >= 21))
+ extern  int	mkstemp(const char *path);
+ #endif
+ #endif
+-- 
+2.8.3
+

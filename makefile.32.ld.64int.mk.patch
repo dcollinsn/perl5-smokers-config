@@ -1,0 +1,27 @@
+--- makefile.mk	2016-07-16 16:09:01.553528800 -0400
++++ makefile.32.ld.64int.mk	2016-07-16 16:11:42.553409300 -0400
+@@ -33,7 +33,7 @@
+ # Uncomment if you want to build a 32-bit Perl using a 32-bit compiler
+ # on a 64-bit version of Windows.
+ #
+-#WIN64		*= undef
++WIN64		*= undef
+ 
+ #
+ # Comment this out if you DON'T want your perl installation to be versioned.
+@@ -99,13 +99,13 @@
+ # or not this is uncommented.)
+ # Note: This option is not supported in 32-bit MSVC60 builds.
+ #
+-#USE_64_BIT_INT	*= define
++USE_64_BIT_INT	*= define
+ 
+ #
+ # Uncomment this if you want to support the use of long doubles in GCC builds.
+ # This option is not supported for MSVC builds.
+ #
+-#USE_LONG_DOUBLE *=define
++USE_LONG_DOUBLE *=define
+ 
+ #
+ # Uncomment this if you want to disable looking up values from

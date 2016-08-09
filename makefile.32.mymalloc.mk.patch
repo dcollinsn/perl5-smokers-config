@@ -1,0 +1,20 @@
+--- makefile.mk	2016-07-16 16:09:01.553528800 -0400
++++ makefile.32.mymalloc.mk	2016-07-16 16:11:33.184942500 -0400
+@@ -33,7 +33,7 @@
+ # Uncomment if you want to build a 32-bit Perl using a 32-bit compiler
+ # on a 64-bit version of Windows.
+ #
+-#WIN64		*= undef
++WIN64		*= undef
+ 
+ #
+ # Comment this out if you DON'T want your perl installation to be versioned.
+@@ -199,7 +199,7 @@
+ # extensions if you change the default.  Currently, this cannot be enabled
+ # if you ask for USE_IMP_SYS above.
+ #
+-#PERL_MALLOC	*= define
++PERL_MALLOC	*= define
+ 
+ #
+ # set this to enable debugging mstats

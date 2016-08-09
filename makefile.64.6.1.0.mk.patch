@@ -1,0 +1,11 @@
+--- makefile.mk	2016-07-16 16:09:01.553528800 -0400
++++ makefile.64.6.1.0.mk	2016-07-16 16:11:15.073080500 -0400
+@@ -234,7 +234,7 @@
+ # not be quoted)
+ #
+ .IF "$(CCTYPE)" == "GCC"
+-CCHOME		*= C:\MinGW
++CCHOME		*= C:\mingw-w64\x86_64-6.1.0\mingw64
+ .ELSE
+ CCHOME		*= $(MSVCDIR)
+ .ENDIF

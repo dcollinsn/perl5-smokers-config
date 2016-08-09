@@ -1,0 +1,29 @@
+--- makefile.mk	2016-07-16 16:09:01.553528800 -0400
++++ makefile.64.4.9.3.static.mk	2016-07-16 16:11:18.204806300 -0400
+@@ -215,7 +215,7 @@
+ # variables below. A static library perl525s.lib will also be created.
+ # Ordinary perl.exe is not affected by this option.
+ #
+-#BUILD_STATIC	*= define
++BUILD_STATIC	*= define
+ 
+ #
+ # in addition to BUILD_STATIC the option ALL_STATIC makes *every*
+@@ -224,7 +224,7 @@
+ # is to have proper linking set so as to be able to create miscellaneous
+ # executables with different built-in extensions
+ #
+-#ALL_STATIC	*= define
++ALL_STATIC	*= define
+ 
+ #
+ # set the install locations of the compiler include/libraries
+@@ -234,7 +234,7 @@
+ # not be quoted)
+ #
+ .IF "$(CCTYPE)" == "GCC"
+-CCHOME		*= C:\MinGW
++CCHOME		*= C:\mingw-w64\x86_64-4.9.3\mingw64
+ .ELSE
+ CCHOME		*= $(MSVCDIR)
+ .ENDIF

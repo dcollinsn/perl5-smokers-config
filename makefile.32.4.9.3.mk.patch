@@ -1,0 +1,20 @@
+--- makefile.mk	2016-07-16 16:09:01.553528800 -0400
++++ makefile.32.4.9.3.mk	2016-07-16 16:12:05.961014700 -0400
+@@ -33,7 +33,7 @@
+ # Uncomment if you want to build a 32-bit Perl using a 32-bit compiler
+ # on a 64-bit version of Windows.
+ #
+-#WIN64		*= undef
++WIN64		*= undef
+ 
+ #
+ # Comment this out if you DON'T want your perl installation to be versioned.
+@@ -234,7 +234,7 @@
+ # not be quoted)
+ #
+ .IF "$(CCTYPE)" == "GCC"
+-CCHOME		*= C:\MinGW
++CCHOME		*= C:\mingw-w64\i686-4.9.3\mingw32
+ .ELSE
+ CCHOME		*= $(MSVCDIR)
+ .ENDIF

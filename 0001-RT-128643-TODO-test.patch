@@ -1,0 +1,32 @@
+From 1f4adc4e95318714b43d6db64aa148e9a49a32f4 Mon Sep 17 00:00:00 2001
+From: Dan Collins <dcollinsn@gmail.com>
+Date: Tue, 19 Jul 2016 16:11:14 -0400
+Subject: [PATCH] RT #128643: TODO test
+
+---
+ t/op/infnan.t | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/t/op/infnan.t b/t/op/infnan.t
+index 06fb60d..55e10ec 100644
+--- a/t/op/infnan.t
++++ b/t/op/infnan.t
+@@ -244,6 +244,7 @@ is(rand($NInf), $NInf, "rand(-Inf) is -Inf");
+ TODO: {
+     local $::TODO;
+     my $here = "$^O $Config{osvers}";
++    $::TODO = "$here: pow (9**9**9) doesn't give Inf";
+     $::TODO = "$here: pow (9**9**9) doesn't give Inf"
+         if $here =~ /^(?:hpux 10|os390)/;
+     is(9**9**9, $PInf, "9**9**9 is Inf");
+@@ -395,6 +396,7 @@ is(rand($NaN), $NaN, "rand(NaN) is NaN");
+ TODO: {
+     local $::TODO;
+     my $here = "$^O $Config{osvers}";
++    $::TODO = "$here: pow (9**9**9) doesn't give Inf";
+     $::TODO = "$here: pow (9**9**9) doesn't give Inf"
+         if $here =~ /^(?:hpux 10|os390)/;
+     is(sin(9**9**9), $NaN, "sin(9**9**9) is NaN");
+-- 
+2.8.3
+

@@ -1,0 +1,337 @@
+From 9cb2b33856f584dcd7ba3e49c06acdc0f76eecbf Mon Sep 17 00:00:00 2001
+From: Dan Collins <dcollinsn@gmail.com>
+Date: Thu, 21 Jul 2016 22:54:05 -0400
+Subject: [PATCH] RT #128643: Provide my_powl to replace broken MinGW
+
+The powl() provided by MinGW is broken: under at least some situations,
+it fails to overflow from LDBL_MAX to INF. This was noticed because
+the test suite uses 9**9**9 as something that "should be" inf, and
+MinGW returned LDBL_MAX instead. This patch provides a powl() from
+MinGW-w64, conditionally including it whenever long doubles are in
+use on a MinGW platform.
+
+This issue has been reported to MinGW as bug #2306. However, in the
+interim, this patch allows Perl to build and test successfully on
+that platform. Once that ticket is resolved upstream, we can update
+core to only provide this function on broken versions of MinGW,
+however that may not be practical: powl() is provided by a dll on
+this platform, so it is possible for someone to build perl on a
+newer MinGW with a fixed powl(), move it to an older MinGW, and
+see the old powl().
+
+The #ifs in this patch deserve some more explanation. We really want
+to gate this on USE_LONG_DOUBLE && __MINGW32_MAJOR_VERSION &&
+!__MINGW64_VERSION_MAJOR. (Yes, one is major version and the other
+is version major. Isn't win32 great?) However, makedef.pl doesn't
+have access to __MINGW(32|64).+. So I used the following approach:
+
+First, we build the Perl_my_powl function on win32 but not win64.
+We use WIN32 && !WIN64 && __GNUC__ to accomplish this, so only
+MinGW and not MSVC or ICC compilers are affected.
+That means we also hit mingw-w64 compilers in 32-bit mode, which
+will slow down compilation slightly and bloat the libperl.dll
+slightly. So we use that condition in win32.c, in embed.fnc, and in
+makedef.pl. That means that these conditions expose Perl_my_powl
+and my_powl.
+
+Second, we use a tighter condition for win32.h. As a result,
+powl() is only replaced on MinGW.org builds. Note that these tests
+are *also* gated on WIN32 && !WIN64, in case there's some
+weird future platform that defines __MINGW32_MAJOR_VERSION and
+__WIN64__.
+---
+ embed.fnc     |   3 +
+ embed.h       |   3 +
+ makedef.pl    |   4 ++
+ proto.h       |   3 +
+ win32/win32.c | 202 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ win32/win32.h |   7 ++
+ 6 files changed, 222 insertions(+)
+
+diff --git a/embed.fnc b/embed.fnc
+index abc1187..53ef69b 100644
+--- a/embed.fnc
++++ b/embed.fnc
+@@ -978,6 +978,9 @@ Ap	|I32	|my_pclose	|NULLOK PerlIO* ptr
+ Ap	|PerlIO*|my_popen	|NN const char* cmd|NN const char* mode
+ #endif
+ Ap	|PerlIO*|my_popen_list	|NN const char* mode|int n|NN SV ** args
++#if defined(USE_LONG_DOUBLE) && defined(WIN32) && !defined(WIN64) && defined(__GNUC__)
++Anp	|long double	|my_powl	|long double x|long double y
++#endif
+ Ap	|void	|my_setenv	|NULLOK const char* nam|NULLOK const char* val
+ Apmb	|I32	|my_stat
+ pX	|I32	|my_stat_flags	|NULLOK const U32 flags
+diff --git a/embed.h b/embed.h
+index b440509..081ce7f 100644
+--- a/embed.h
++++ b/embed.h
+@@ -894,6 +894,9 @@
+ #if defined(USE_LOCALE_COLLATE)
+ #define sv_collxfrm_flags(a,b,c)	Perl_sv_collxfrm_flags(aTHX_ a,b,c)
+ #endif
++#if defined(USE_LONG_DOUBLE) && defined(WIN32) && !defined(WIN64) && defined(__GNUC__)
++#define my_powl			Perl_my_powl
++#endif
+ #if defined(USE_PERLIO)
+ #define PerlIO_clearerr(a)	Perl_PerlIO_clearerr(aTHX_ a)
+ #define PerlIO_close(a)		Perl_PerlIO_close(aTHX_ a)
+diff --git a/makedef.pl b/makedef.pl
+index 956914e..e1ddbd5 100644
+--- a/makedef.pl
++++ b/makedef.pl
+@@ -561,6 +561,10 @@ if ($define{'PERL_GLOBAL_STRUCT'}) {
+     ++$skip{$_} foreach qw(Perl_init_global_struct Perl_free_global_struct);
+ }
+ 
++++$skip{Perl_my_powl}
++    unless $define{USE_LONG_DOUBLE} && $define{WIN32} && !$define{WIN64} &&
++           $ARGS{CCTYPE} =~ /^GCC$/;
++
+ ++$skip{PL_op_exec_cnt}
+     unless $define{PERL_TRACE_OPS};
+ 
+diff --git a/proto.h b/proto.h
+index ec2ae33..a947775 100644
+--- a/proto.h
++++ b/proto.h
+@@ -5808,6 +5808,9 @@ PERL_CALLCONV char*	Perl_sv_collxfrm_flags(pTHX_ SV *const sv, STRLEN *const nxp
+ #define PERL_ARGS_ASSERT_SV_COLLXFRM_FLAGS	\
+ 	assert(sv); assert(nxp)
+ #endif
++#if defined(USE_LONG_DOUBLE) && defined(WIN32) && !defined(WIN64) && defined(__GNUC__)
++PERL_CALLCONV long double	Perl_my_powl(long double x, long double y);
++#endif
+ #if defined(USE_PERLIO)
+ PERL_CALLCONV void	Perl_PerlIO_clearerr(pTHX_ PerlIO *f);
+ PERL_CALLCONV int	Perl_PerlIO_close(pTHX_ PerlIO *f);
+diff --git a/win32/win32.c b/win32/win32.c
+index 6ac73e2..0511eb5 100644
+--- a/win32/win32.c
++++ b/win32/win32.c
+@@ -4795,3 +4795,205 @@ Perl_sys_intern_dup(pTHX_ struct interp_intern *src, struct interp_intern *dst)
+ }
+ #  endif /* USE_ITHREADS */
+ #endif /* HAVE_INTERP_INTERN */
++
++#if defined(USE_LONG_DOUBLE) && defined(WIN32) && !defined(WIN64) && defined(__GNUC__)
++/* Conditionally build Perl_my_powl(). This is conditional on the same
++ * criteria as are in makedef.pl, because this needs to match perldll.def.
++ * That isn't the same as when we actually want this function to be used,
++ * though, so you'll find that we only #define powl under certain compilers
++ * in win32.h.
++ */
++
++/* This #if block is a modified form of pow.def.h, provided by the
++ * mingw-w64.org project, forked from mingw-w64-v4.0.6.tar.bz2. It
++ * was modified for use in perl in July 2016.
++ *
++ * The original version of this Software is provided under the Zope
++ * Public License (ZPL) Version 2.1.
++ *
++ * Copyright (c) 2009, 2010 by the mingw-w64 project
++ *
++ * This license has been certified as open source. It has also been
++ * designated as GPL compatible by the Free Software Foundation (FSF).
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 
++ *    1. Redistributions in source code must retain the accompanying copyright
++ *       notice, this list of conditions, and the following disclaimer.
++ *    2. Redistributions in binary form must reproduce the accompanying
++ *       copyright notice, this list of conditions, and the following disclaimer
++ *       in the documentation and/or other materials provided with the
++ *       distribution.
++ *    3. Names of the copyright holders must not be used to endorse or promote
++ *       products derived from this software without prior written permission
++ *       from the copyright holders.
++ *    4. The right to distribute this software or to use it for any purpose does
++ *       not give you the right to use Servicemarks (sm) or Trademarks (tm) of
++ *       the copyright holders.  Use of them is covered by separate agreement
++ *       with the copyright holders.
++ *    5. If any files are modified, you must cause the modified files to carry
++ *       prominent notices stating that you changed the files and the date of
++ *       any change.
++ * 
++ *  Disclaimer
++ * 
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY EXPRESSED
++ *  OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
++ *  EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
++ *  OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
++ *  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++#ifndef NANF
++#define NANF __builtin_nanf ("")
++#endif
++#ifndef NANL
++#define NANL __builtin_nanl ("")
++#endif
++
++
++#ifndef _SET_ERRNO
++#define _SET_ERRNO(x) errno = (x)
++#endif
++
++
++static long double
++internal_modf (long double value, long double *iptr)
++{
++  long double int_part = (long double) 0.0;
++#ifdef _WIN64
++  asm ("pushq %%rax\n\tsubq $8, %%rsp\n"
++    "fnstcw 4(%%rsp)\n"
++    "movzwl 4(%%rsp), %%eax\n"
++    "orb $12, %%ah\n"
++    "movw %%ax, (%%rsp)\n"
++    "fldcw (%%rsp)\n"
++    "frndint\n"
++    "fldcw 4(%%rsp)\n"
++    "addq $8, %%rsp\npopq %%rax" : "=t" (int_part) : "0" (value)); /* round */
++#else
++  asm ("push %%eax\n\tsubl $8, %%esp\n"
++    "fnstcw 4(%%esp)\n"
++    "movzwl 4(%%esp), %%eax\n"
++    "orb $12, %%ah\n"
++    "movw %%ax, (%%esp)\n"
++    "fldcw (%%esp)\n"
++    "frndint\n"
++    "fldcw 4(%%esp)\n"
++    "addl $8, %%esp\n\tpop %%eax\n" : "=t" (int_part) : "0" (value)); /* round */
++#endif
++  if (iptr)
++    *iptr = int_part;
++  return (isinf (value) ?  (long double) 0.0 : value - int_part);
++}
++
++long double __powil (long double x, int n);
++
++long double
++Perl_my_powl (long double x, long double y)
++{
++  int x_class = fpclassify (x);
++  int y_class = fpclassify (y);
++  long odd_y = 0;
++  long double d, rslt;
++
++  if (y_class == FP_ZERO || x == 1.0L)
++    return 1.0L;
++  else if (x_class == FP_NAN || y_class == FP_NAN)
++    {
++      rslt = (signbit(x) ? -NANL : NANL);
++      _SET_ERRNO (EDOM);
++      return rslt;
++    }
++  else if (x_class == FP_ZERO)
++    {
++      if (y_class == FP_INFINITE)
++        return (signbit(y) ? HUGE_VALL : 0.0L);
++
++      if (signbit(x) && modfl (y, &d) != 0.0)
++        {
++          return signbit (y) ? (1.0 / -x) : 0.0L;
++        }
++      odd_y = (modfl (ldexpl (y, -1), &d) != 0.0) ? 1 : 0;
++      if (!signbit(y))
++        {
++          if (!odd_y || !signbit (x))
++            return 0.0L;
++          return -0.0L;
++        }
++
++      if (!odd_y || !signbit (x))
++        return HUGE_VALL;
++      return (signbit(x) ? -HUGE_VALL : HUGE_VALL);
++    }
++  else if (y_class == FP_INFINITE)
++    {
++      long double a_x;
++
++      if (x_class == FP_INFINITE)
++        return (signbit (y) ? 0.0L : HUGE_VALL);
++      a_x = (signbit (x) ? -x : x);
++      if (a_x == 1.0)
++        return 1.0L;
++      if (a_x > 1.0)
++        return (signbit (y) == 0 ? HUGE_VALL : 0.0L);
++      return (!signbit (y) ? 0.0L : HUGE_VALL);
++    }
++  else if (x_class == FP_INFINITE)
++    {
++      /* pow (x, y) signals the invalid operation exception for finite x < 0 and finite non-integer y.  */
++      if (signbit(x) && modfl (y, &d) != 0.0)
++        {
++          return signbit(y) ? 1.0 / -x : -x;
++        }
++      odd_y = (modfl (ldexpl (y, -1), &d) != 0.0) ? 1 : 0;
++      /* pow( -inf, y) = +0 for y<0 and not an odd integer,  */
++      if (signbit(x) && signbit(y) && !odd_y)
++        return 0.0L;
++      /* pow( -inf, y) = -inf for y an odd integer > 0.  */
++      if (signbit(x) && !signbit(y) && odd_y)
++        return -HUGE_VALL;
++      /* pow( -inf, y) = +inf for y>0 and not an odd integer.  */
++      if (signbit(x) && !signbit(y) && !odd_y)
++        return HUGE_VALL;
++      /* pow (+/-inf, y) is +/-0 with no exception for y an odd integer < 0. */
++      if (signbit(y))
++      {
++        /* pow (+/-inf, y) is +0 with no exception for finite y < 0 and not an odd integer.  */
++        return (odd_y && signbit(x) ? -0.0L : 0.0L);
++      }
++      /* pow (+/-inf, y) is +/-inf with no exception for finite y > 0 an odd integer.  */
++      /* pow (+/-inf, y) is +inf with no exception for finite y > 0 and not an odd integer.  */
++      return (odd_y && signbit(x) ? -HUGE_VALL : HUGE_VALL);
++    }
++
++  if (modfl (y, &d) != 0.0)
++    {
++      if (signbit (x))
++        {
++          _SET_ERRNO (EDOM);
++          return -NANL;
++        }
++      if (y == 0.5L)
++        {
++          asm ("fsqrt" : "=t" (rslt) : "0" (x));
++          return rslt;
++        }
++    }
++  else if ((d <= (long double) INT_MAX && d >= (long double) INT_MIN))
++     return __powil (x, (int) y);
++  /* As exp already checks for minlog and maxlog no further checks are necessary.  */
++  rslt = (long double) exp2l ((long double) y * log2l ((long double) fabsl (x)));
++
++  if (signbit (x) && modfl (ldexpl (y, -1), &d) != 0.0)
++    rslt = -rslt;
++  return rslt;
++}
++#endif
+diff --git a/win32/win32.h b/win32/win32.h
+index 9b79e00..8a25d48 100644
+--- a/win32/win32.h
++++ b/win32/win32.h
+@@ -662,5 +662,12 @@ DllExport void *win32_signal_context(void);
+ #define Win_CreateSemaphore   CreateSemaphore
+ #endif
+ 
++#if defined(USE_LONG_DOUBLE) && defined(WIN32) && !defined(WIN64) && defined(__MINGW32_MAJOR_VERSION) && !defined(__MINGW64_VERSION_MAJOR)
++/* MinGW.org provides a powl that is broken: 9**9**9 returns
++ * LDBL_MAX instead of INF.
++ */
++#define powl my_powl
++#endif
++
+ #endif /* _INC_WIN32_PERL5 */
+ 
+-- 
+2.8.3
+
