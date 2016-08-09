@@ -1,0 +1,37 @@
+From 892c31e4484bf06a42d4bc8dba7258bad33299e9 Mon Sep 17 00:00:00 2001
+From: Dan Collins <dcollinsn@gmail.com>
+Date: Thu, 14 Jul 2016 19:51:13 -0400
+Subject: [PATCH] [RT #128598] libperl.t: optimizer may use any builtins
+
+porting/libperl.t makes sure that programmers don't accidentally
+use unsafe builtins like strcpy. However, the optimizer is able
+to use these on its own. For example, quadmath builds with -O2
+or higher with gcc will use strcpy in locale.c, even though that
+function isn't used in the source code.
+
+This would skip those tests only under -O2 or -O3 and only if they
+would fail. That way, any errant appearances of these symbols will
+be visible in test output, and if those functions are used directly,
+the test will still fail under -O0 or -O1.
+---
+ t/porting/libperl.t | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/t/porting/libperl.t b/t/porting/libperl.t
+index 21e7edb..e82cb8a 100644
+--- a/t/porting/libperl.t
++++ b/t/porting/libperl.t
+@@ -547,6 +547,10 @@ for my $symbol (sort keys %unexpected) {
+       SKIP: {
+         skip("locale.o legitimately uses strcat");
+       }
++    } elsif (@o > 0 && $Config{optimize} =~ /-O[23]/) {
++      SKIP: {
++        skip("uses $symbol (@o), but optimizer may use it legitimately");
++      }
+     } else {
+         is(@o, 0, "uses no $symbol (@o)");
+     }
+-- 
+2.8.1
+
