@@ -11,5 +11,5 @@ index b50a175..6c40af0 100644
      ok $got0 == 0 or print("# $got0\n");
 +    }
      SKIP: {
- 	skip "alarm interval exceeded", 2 if $t1 - $t0 >= 0.5;
- 	ok $got1 > 0;
+        skip "alarm interval exceeded", 2 if $t1 - $t0 >= 0.5;
+        ok $got1 > 0;

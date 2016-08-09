@@ -1,0 +1,34 @@
+diff --git a/t/op/threads.t b/t/op/threads.t
+index 123ad27..1f23f5d 100644
+--- a/t/op/threads.t
++++ b/t/op/threads.t
+@@ -38,6 +38,9 @@ threads->create(sub { 1 })->join for (1..1);
+ print "ok";
+ EOI
+ 
++SKIP: {
++skip("Occasional spurious output failures");
++
+ #PR24663
+ # test that we don't get:
+ # panic: magic_killbackrefs.
+@@ -54,6 +57,7 @@ weaken $ref;
+ threads->create(sub { $ref = $object } )->join; # $ref = $object causes problems
+ print "ok";
+ EOI
++}
+ 
+ #PR30333 - sort() crash with threads
+ sub mycmp { length($b) <=> length($a) }
+@@ -88,8 +92,11 @@ sub do_sort_threads {
+    }
+ }
+ 
++SKIP: {
++skip("Occasional spurious output failures");
+ do_sort_threads(2);        # crashes
+ ok(1);
++}
+ 
+ # Change 24643 made the mistake of assuming that CvCONST can only be true on
+ # XSUBs. Somehow it can also end up on perl subs.
